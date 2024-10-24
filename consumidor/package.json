@@ -1,0 +1,11 @@
+{
+  "name": "consumidor",
+  "version": "1.0.0",
+  "description": "Consimidor da fila",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sautners",
+  "license": "ISC"
+}
