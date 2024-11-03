@@ -21,19 +21,6 @@ redisClient.connect().then(() => {
   console.log('Conectado ao Redis');
 });
 
-// Função para gerar o caminho do certificado
-function generateCertificate(nome_aluno, nome_curso) {
-  // Gerar um GUID para o nome do arquivo
-  const guid = uuidv4();
-  const certPath = path.join(__dirname, 'certificados', `${guid}.pdf`);
-  
-  // Simulação da criação do PDF
-  // Aqui você deve adicionar o código real para criar o PDF
-  fs.writeFileSync(certPath, `Certificado de ${nome_aluno} - Curso: ${nome_curso}`);
-  
-  return certPath;
-}
-
 // Função para processar mensagens da fila
 async function processQueueMessage(message) {
   const { nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma } = JSON.parse(message.content.toString());
@@ -42,21 +29,12 @@ async function processQueueMessage(message) {
     // Conexão com o banco de dados
     const connection = await mysql.createConnection(dbConfig);
 
-    // Gerar o certificado
-    const certPath = generateCertificate(nome_aluno, nome_curso);
-
     // Inserção no banco
     const query = `INSERT INTO diplomas (nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma) VALUES (?, ?, ?, ?, ?)`;
     await connection.execute(query, [nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma]);
-    
-    // Salvar o caminho do certificado no Redis
-    const cacheKey = `certificado_${nome_aluno}_${nome_curso}`;
-    await redisClient.setEx(cacheKey, 3600, certPath); // 1 hora de TTL
-
     await connection.end();
 
     console.log("Dados inseridos no banco de dados:", { nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma });
-    console.log("Certificado gerado e salvo em:", certPath);
 
     // Confirma que a mensagem foi processada
     channel.ack(message);
