@@ -1,28 +1,12 @@
 version: '3.8'
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   db:
-    image: postgres:13
+    image: mysql:5.7
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: certificado
-      POSTGRES_DB: certificates_db
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: prog_diplomas
     ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
+      - "3306:3306"
 
   redis:
     image: redis:alpine
@@ -39,37 +23,7 @@ services:
       - REDISINSIGHT_AUTH_USERNAME=admin
       - REDISINSIGHT_AUTH_PASSWORD=admin123
 
-  api:
-    build:
-      context: ./api-certificado
-      dockerfile: Dockerfile
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - REDIS_HOST=redis
-      - DB_HOST=db
-    depends_on:
-      - db
-      - rabbitmq
-      - redis
-    ports:
-      - "3000:3000"
-
-  worker:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - REDIS_HOST=redis
-      - DB_HOST=db
-    depends_on:
-      - db
-      - rabbitmq
-    volumes:
-      - diploma_data:/diploma
-
 volumes:
-  rabbitmq_data:
   db_data:
   redis_data:
   diploma_data:

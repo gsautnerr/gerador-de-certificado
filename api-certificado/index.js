@@ -1,19 +1,57 @@
 const express = require('express');
+const mysql = require('mysql2/promise');
 const amqp = require('amqplib');
 const bodyParser = require('body-parser');
 const redis = require('redis');
-
 const app = express();
 app.use(bodyParser.json());
 
-// Conexão com o Redis
-const redisClient = redis.createClient();
-redisClient.on('error', (err) => {
-  console.error('Erro ao conectar ao Redis:', err);
+// Conexão com MySQL
+const db = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: 'secret',
+  database: 'prog_diplomas'
 });
 
-redisClient.connect().then(() => {
-  console.log('Conectado ao Redis');
+// Conexão com o Redis
+const client = redis.createClient();
+
+client.on('error', (err) => {
+    console.error('Erro ao conectar ao Redis:', err);
+});
+
+client.connect().then(() => {
+    console.log('Conectado ao Redis');
+});
+
+app.get('/diplomas', async (req, res) => {
+  try {
+      console.log('/diplomas request begin');
+      const key = 'diploma_list';
+
+      // Verifica se os dados estão no cache
+      const diplomas = await client.get(key);  // Utilizando await para leitura de cache
+      console.log('read from redis');
+
+      if (diplomas) {
+          // Dados encontrados no cache, retorna imediatamente
+          return res.json({ source: 'cache', data: JSON.parse(diplom) });
+      }
+
+      // Dados não encontrados no cache, consulta os produtos no MySQL
+      const [rows] = await db.query('SELECT * FROM diplomas');
+      const dbDiplomas = JSON.stringify(rows);
+
+      // Armazena os resultados da consulta no cache com TTL de 1 hora
+      await client.setEx(key, 3600, dbDiplomas);  // Utilizando await para setEx no Redis
+
+      // Retorna os dados consultados do banco de dados
+      res.json({ source: 'database', data: rows });
+  } catch (error) {
+      console.error('Erro ao acessar o cache ou banco de dados:', error);
+      res.status(500).send('Erro interno');
+  }
 });
 
 // Função para enviar mensagem para a fila RabbitMQ
@@ -35,7 +73,7 @@ async function sendToQueue(message) {
 }
 
 // Endpoint para receber JSON e enviar à fila
-app.post('/diploma', async (req, res) => {
+app.post('/diplomas', async (req, res) => {
   const {
     nome_aluno,
     data_conclusao,
