@@ -1,10 +1,38 @@
-version: '3.8'
 services:
-  db:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  diploma-api:
+    build:
+        context: ./api-certificado
+        dockerfile: Dockerfile
+    environment:
+        - DB_HOST=mysql
+        - DB_USER=user
+        - DB_PASSWORD=userpassword
+        - DB_DATABASE=prog_diplomas
+        - RABBITMQ_HOST=rabbitmq
+    depends_on:
+        - mysql
+        - rabbitmq
+    ports:
+        - "3000:3000"
+
+  mysql:
     image: mysql:5.7
     environment:
       MYSQL_ROOT_PASSWORD: secret
       MYSQL_DATABASE: prog_diplomas
+      MYSQL_USER: user
+      MYSQL_PASSWORD: userpassword
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./database/ddl.sql:/docker-entrypoint-initdb.d/ddl.sql
     ports:
       - "3306:3306"
 
@@ -12,8 +40,6 @@ services:
     image: redis:alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
 
   redisinsight:
     image: redis/redisinsight:latest
@@ -24,6 +50,5 @@ services:
       - REDISINSIGHT_AUTH_PASSWORD=admin123
 
 volumes:
-  db_data:
-  redis_data:
-  diploma_data:
+  mysqldata:
+  rabbitmq_data:
