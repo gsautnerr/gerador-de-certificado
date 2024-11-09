@@ -20,6 +20,20 @@ connection.connect((err) => {
   console.log('Conectado ao MySQL!');
 });
 
+// Conexão com o Redis
+const client = redis.createClient({
+  host: 'redis'
+});
+
+client.on('error', (err) => {
+    console.error('Erro ao conectar ao Redis:', err);
+});
+
+client.connect().then(() => {
+    console.log('Conectado ao Redis');
+});
+
+
 // Função para enviar mensagem para a fila RabbitMQ
 async function sendToQueue(message) {
   try {
@@ -36,18 +50,36 @@ async function sendToQueue(message) {
   }
 }
 
-// Conexão com o Redis
-const client = redis.createClient({
-  host: 'redis'
+app.get('/diplomas', async (req, res) => {
+  try {
+      console.log('/diplomas request begin');
+      const key = 'diploma_list';
+
+      // Verifica se os dados estão no cache
+      const diplomas = await client.get(key);  // Utilizando await para leitura de cache
+      console.log('read from redis');
+
+      if (diplomas) {
+          // Dados encontrados no cache, retorna imediatamente
+          return res.json({ source: 'cache', data: JSON.parse(diplomas) });
+      }
+
+      // Dados não encontrados no cache, consulta os produtos no MySQL
+      const [rows] = await db.query('SELECT * FROM diplomas');
+      const dbdiplomas = JSON.stringify(rows);
+
+      // Armazena os resultados da consulta no cache com TTL de 1 hora
+      await client.setEx(key, 3600, dbdiplomas);  // Utilizando await para setEx no Redis
+
+      // Retorna os dados consultados do banco de dados
+      res.json({ source: 'database', data: rows });
+  } catch (error) {
+      console.error('Erro ao acessar o cache ou banco de dados:', error);
+      res.status(500).send('Erro interno');
+  }
 });
 
-client.on('error', (err) => {
-    console.error('Erro ao conectar ao Redis:', err);
-});
 
-client.connect().then(() => {
-    console.log('Conectado ao Redis');
-});
 
 // Endpoint para receber JSON e enviar à fila
 app.post('/diplomas', async (req, res) => {

@@ -18,10 +18,27 @@ services:
         - DB_DATABASE=prog_diplomas
         - RABBITMQ_HOST=rabbitmq
     depends_on:
+        - redis
         - mysql
         - rabbitmq
     ports:
         - "3000:3000"
+       
+  worker:
+    build:
+        context: ./worker
+        dockerfile: Dockerfile
+    environment:
+        - DB_HOST=mysql
+        - DB_USER=user
+        - DB_PASSWORD=userpassword
+        - DB_DATABASE=prog_diplomas
+    depends_on:
+        - redis
+        - mysql
+        - rabbitmq
+    volumes:
+        - C:/Diplomas:/app/diplomas
 
   mysql:
     image: mysql:5.7

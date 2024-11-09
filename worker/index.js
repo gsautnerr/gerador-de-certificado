@@ -1,64 +1,61 @@
-const amqp = require('amqplib');
-const mysql = require('mysql2/promise'); // Para usar async/await com MySQL
-const redis = require('redis'); // Adicionando a biblioteca Redis
-const fs = require('fs');
-const path = require('path'); // Para manipulação de caminhos de arquivos
-const { v4: uuidv4 } = require('uuid'); // Importando a função para gerar GUID
+const amqp = require('amqplib/callback_api');
+const puppeteer = require("puppeteer");
+const path = require("path");
 
-// Configuração do MySQL
-const dbConfig = {
-  host: 'mysql',
-  user: 'user',
-  password: 'certificado',
-  database: 'prog_diplomas'
-};
+// const queue = 'diplomasQueue';
+// setTimeout(() => {
+//     console.log(`Aguardando o rabbitmq iniciar`);
+// }, 10000);
 
-// Conexão com o Redis
-const redisClient = redis.createClient();
-redisClient.on('error', (err) => console.error('Erro ao conectar ao Redis:', err));
 
-redisClient.connect().then(() => {
-  console.log('Conectado ao Redis');
-});
-
-// Função para processar mensagens da fila
-async function processQueueMessage(message) {
-  const { nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma } = JSON.parse(message.content.toString());
-
-  try {
-    // Conexão com o banco de dados
-    const connection = await mysql.createConnection(dbConfig);
-
-    // Inserção no banco
-    const query = `INSERT INTO diplomas (nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma) VALUES (?, ?, ?, ?, ?)`;
-    await connection.execute(query, [nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma]);
-    await connection.end();
-
-    console.log("Dados inseridos no banco de dados:", { nome_aluno, data_conclusao, nome_curso, data_emissao, template_diploma });
-
-    // Confirma que a mensagem foi processada
-    channel.ack(message);
-  } catch (error) {
-    console.error("Erro ao inserir dados no banco de dados:", error);
-  }
+async function downloadPdfFromHtmlFile(htmlFilePath, outputPath) {
+  const browser = await puppeteer.launch({ headless: "new" });
+  const page = await browser.newPage();
+   
+  const absolutePath = path.resolve(htmlFilePath);
+  await page.goto(`file://${absolutePath}`, { waitUntil: "networkidle0" });
+     
+  await page.pdf({ path: outputPath, format: "A4" });
+  
+  await browser.close();
 }
+const inputHtmlFile = "template.html";
+const { v4: uuidv4 } = require('uuid');
+const random_uuid = uuidv4();
+const outputFile = "C:/Diplomas/"+random_uuid +".pdf";
 
-// Conectar ao RabbitMQ e consumir a fila
-async function consumeQueue() {
-  try {
-    const connection = await amqp.connect('amqp://rabbitmq');
-    const channel = await connection.createChannel();
-    const queue = 'diplomasQueue';
+downloadPdfFromHtmlFile(inputHtmlFile, outputFile)
+  .then(() => console.log(`PDF salvo com sucessp em: ${outputFile}`)
+)
+  .catch((error) => console.error("Erro ao salvar diploma: ", error));
 
-    await channel.assertQueue(queue, { durable: true });
-    console.log("Aguardando mensagens na fila...");
 
-    channel.consume(queue, (message) => {
-      processQueueMessage(message);
-    });
-  } catch (error) {
-    console.error("Erro ao consumir a fila:", error);
-  }
-}
+// amqp.connect('amqp://rabbitmq', function (error0, connection) {
+//     if (error0) {
+//         throw error0;
+//     }
+//     connection.createChannel(function (error1, channel) {
+//         if (error1) {
+//             throw error1;
+//         }
 
-consumeQueue();
+//         channel.assertQueue(queue, {
+//             durable: true
+//         });
+
+//         console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", queue);
+
+//         channel.consume(queue, function (msg) {
+//             console.log(" [x] Received %s", msg.content.toString());
+//             const inicio = Date.now();
+
+//             const randomInt = Math.floor(Math.random() * (6000 - 2000 + 1)) + 2000;
+//             setTimeout(() => {
+//                 console.log(`Processamento de 5 segundos concluído. \r\nNome${ msg.content.toString()}\r\nInício: ${inicio}\r\nFim: ${Date.now()}`);
+//                 channel.ack(msg);
+//             }, randomInt);
+//         }, {
+//             noAck: false
+//         });
+//     });
+// });
